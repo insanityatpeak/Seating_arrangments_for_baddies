@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Seating Search</title>
+    
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js for parsing PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        .drag-active {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // --- Icons ---
+        const FileUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>;
+        const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
+        const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>;
+        const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
+        const FileIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>;
+        const ExternalLinkIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
+        const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22.01"/><line x1="15" y1="22" x2="15" y2="22.01"/><line x1="9" y1="18" x2="9" y2="18.01"/><line x1="15" y1="18" x2="15" y2="18.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/></svg>;
+        const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+        const BookIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
+        const AlertIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+
+        const App = () => {
+            const [files, setFiles] = useState([]);
+            const [studentData, setStudentData] = useState([]); 
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [searchQuery, setSearchQuery] = useState("");
+            const [searchResults, setSearchResults] = useState([]);
+            const [dragActive, setDragActive] = useState(false);
+            const [parseStatus, setParseStatus] = useState("");
+
+            // --- Regex Patterns ---
+            const REG_NO_PATTERN = /\b\d{2}[A-Z]{0,2}\d{1,5}[A-Z]{0,5}\d+\b/g;
+            // More robust Room regex that stops at 'Gate', 'Slot', 'Row', 'Col' or End of line
+            const ROOM_BUILDING_PATTERN = /(?:Room|Hall)\s*(?:Number|No\.?|Num)?\s*[:\-\s]+\s*([A-Za-z0-9\-\s]+?)(?:,\s*([A-Za-z0-9\-\s,]+?))?(?=\s*(?:Col|Row|Gate|Slot|Time|$))/gi;
+            const COL_PATTERN = /Col-?(\d+)/i;
+            const ROW_PATTERN = /Row-?(\d+)/i;
+            const TIME_SLOT_PATTERN = /(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)\s*-\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm))/g;
+            const COURSE_PATTERN = /\b[A-Z]{2,5}\d{3,4}\b/g;
+
+            // --- Normalization Helper ---
+            const normalizeId = (id) => {
+                if (!id) return "";
+                return id.toUpperCase()
+                    .replace(/\s+/g, '') 
+                    .replace(/H/g, '11') // Fix common OCR error
+                    .replace(/[ILl]/g, '1') 
+                    .replace(/[O]/g, '0'); 
+            };
+
+            const handleDrag = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.type === "dragenter" || e.type === "dragover") {
+                    setDragActive(true);
+                } else if (e.type === "dragleave") {
+                    setDragActive(false);
+                }
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(false);
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    processFiles(Array.from(e.dataTransfer.files));
+                }
+            };
+
+            const handleFileInput = (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    processFiles(Array.from(e.target.files));
+                }
+            };
+
+            const processFiles = async (newFiles) => {
+                setIsProcessing(true);
+                setParseStatus("Reading files...");
+                
+                const validFiles = newFiles.filter(f => f.type === "application/pdf");
+                const processedFiles = validFiles.map(f => ({
+                    file: f,
+                    url: URL.createObjectURL(f),
+                    name: f.name
+                }));
+
+                setFiles(prev => [...prev, ...processedFiles]);
+
+                let allExtractedData = [];
+
+                for (const fileObj of processedFiles) {
+                    setParseStatus(`Processing ${fileObj.name}...`);
+                    try {
+                        const fileData = await parsePDF(fileObj.file, fileObj.url);
+                        allExtractedData = [...allExtractedData, ...fileData];
+                    } catch (err) {
+                        console.error(`Error parsing ${fileObj.name}:`, err);
+                        setParseStatus(`Error processing ${fileObj.name}`);
+                    }
+                }
+
+                setStudentData(prev => [...prev, ...allExtractedData]);
+                setIsProcessing(false);
+                setParseStatus("Done!");
+                setTimeout(() => setParseStatus(""), 2000);
+            };
+
+            const parsePDF = async (file, fileUrl) => {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                
+                let extractedStudents = [];
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    
+                    // 1. Sort items by Y (desc) then X (asc) to correct reading order
+                    // PDF Coords: Y=0 is bottom. Higher Y is Higher on page.
+                    const items = textContent.items.map(item => ({
+                        text: item.str,
+                        x: item.transform[4],
+                        y: item.transform[5],
+                        w: item.width,
+                        h: item.height
+                    })).sort((a, b) => {
+                        if (Math.abs(a.y - b.y) > 5) return b.y - a.y; // Sort by line (approx 5px tolerance)
+                        return a.x - b.x; // Then by X
+                    });
+
+                    // 2. Build full text AND a coordinate map for every character
+                    let fullText = "";
+                    let coordMap = []; // Index -> {y, x}
+                    
+                    items.forEach(item => {
+                        // Insert space if gap is detected (naive)
+                        if (fullText.length > 0) {
+                            fullText += " ";
+                            coordMap.push(null); // Space has no exact coord, or use prev
+                        }
+                        
+                        for (let char of item.text) {
+                            fullText += char;
+                            coordMap.push({ x: item.x, y: item.y });
+                        }
+                    });
+
+                    // 3. Extract Headers with their Y-coordinates
+                    let roomHeaders = [];
+                    let match;
+                    
+                    // Reset LastIndex for global regexes
+                    ROOM_BUILDING_PATTERN.lastIndex = 0;
+                    while ((match = ROOM_BUILDING_PATTERN.exec(fullText)) !== null) {
+                        // Find Y coordinate of this match
+                        const matchIndex = match.index;
+                        const validCoord = findValidCoord(coordMap, matchIndex);
+                        
+                        if (validCoord) {
+                            roomHeaders.push({
+                                room: match[1].trim(),
+                                building: match[2] ? match[2].trim() : "Unknown",
+                                y: validCoord.y
+                            });
+                        }
+                    }
+
+                    // 4. Extract Row/Col/Student info from raw items
+                    // We go back to raw items for Grid/Student extraction as it's cleaner than regexing the giant string for small tokens
+                    let studentsOnPage = [];
+                    let colHeaders = [];
+                    let rowLabels = [];
+                    
+                    items.forEach(item => {
+                        // Cols
+                        const colMatch = item.text.match(COL_PATTERN);
+                        if (colMatch) colHeaders.push({ num: colMatch[1], x: item.x, y: item.y });
+
+                        // Rows
+                        const rowMatch = item.text.match(ROW_PATTERN);
+                        if (rowMatch) rowLabels.push({ num: rowMatch[1], y: item.y });
+                        
+                        // Students
+                        const ids = item.text.match(REG_NO_PATTERN);
+                        if (ids) {
+                            ids.forEach(id => {
+                                if (id.length < 5) return;
+                                studentsOnPage.push({ id, x: item.x, y: item.y });
+                            });
+                        }
+                    });
+
+                    // 5. Global Page Metadata (Fallback)
+                    let pageTime = "Unknown";
+                    let pageCourses = "Unknown";
+                    const timeMatch = fullText.match(TIME_SLOT_PATTERN);
+                    if (timeMatch) pageTime = timeMatch[0].trim();
+                    const courseMatches = fullText.match(COURSE_PATTERN);
+                    if (courseMatches) pageCourses = [...new Set(courseMatches)].join(", ");
+
+                    // 6. Auto-calculate columns if missing
+                    let calculatedCols = [];
+                    if (colHeaders.length === 0 && studentsOnPage.length > 0) {
+                        const xCoords = studentsOnPage.map(s => s.x).sort((a, b) => a - b);
+                        let clusters = [];
+                        if (xCoords.length > 0) {
+                            let currentCluster = [xCoords[0]];
+                            for (let k = 1; k < xCoords.length; k++) {
+                                if (xCoords[k] - xCoords[k-1] > 30) {
+                                    clusters.push(currentCluster);
+                                    currentCluster = [];
+                                }
+                                currentCluster.push(xCoords[k]);
+                            }
+                            clusters.push(currentCluster);
+                        }
+                        calculatedCols = clusters.map((cluster, idx) => ({
+                            num: (idx + 1).toString(),
+                            x: cluster.reduce((a, b) => a + b, 0) / cluster.length
+                        }));
+                    }
+                    const activeColHeaders = colHeaders.length > 0 ? colHeaders : calculatedCols;
+
+                    // 7. ASSIGNMENT LOGIC (Spatial)
+                    studentsOnPage.forEach(student => {
+                        // A. Find Room: The closest room header *ABOVE* the student (Student Y < Header Y)
+                        // Initialize with unknown or the first header found (fallback)
+                        let assignedRoom = { room: "Unknown", building: "Unknown" };
+                        
+                        // Filter headers that are logically "above" the student (Y is higher)
+                        // And pick the one with the smallest Y-difference (closest)
+                        const relevantHeaders = roomHeaders.filter(h => h.y > student.y);
+                        if (relevantHeaders.length > 0) {
+                            // Sort by Y ascending (closest to student Y upwards) is actually tricky
+                            // We want the smallest (h.y - s.y). 
+                            relevantHeaders.sort((a, b) => (a.y - student.y) - (b.y - student.y));
+                            assignedRoom = relevantHeaders[0];
+                        } else if (roomHeaders.length > 0) {
+                            // Fallback: If no header is strictly above, take the last one on page (unlikely but safe)
+                            assignedRoom = roomHeaders[roomHeaders.length - 1];
+                        }
+
+                        // B. Find Row
+                        let closestRow = "Unknown";
+                        let minYDiff = Infinity;
+                        rowLabels.forEach(row => {
+                            // Row label should be roughly same Y
+                            const diff = Math.abs(student.y - row.y);
+                            if (diff < 20 && diff < minYDiff) { // strict tolerance for rows
+                                minYDiff = diff;
+                                closestRow = row.num;
+                            }
+                        });
+                        // Fallback loose search for row if strict failed
+                        if (closestRow === "Unknown") {
+                             rowLabels.forEach(row => {
+                                const diff = Math.abs(student.y - row.y);
+                                if (diff < minYDiff) {
+                                    minYDiff = diff;
+                                    closestRow = row.num;
+                                }
+                            });
+                        }
+
+                        // C. Find Col
+                        let closestCol = "Unknown";
+                        let minXDiff = Infinity;
+                        activeColHeaders.forEach(col => {
+                            const diff = Math.abs(student.x - col.x);
+                            if (diff < minXDiff) {
+                                minXDiff = diff;
+                                closestCol = col.num;
+                            }
+                        });
+
+                        extractedStudents.push({
+                            id: student.id,
+                            normId: normalizeId(student.id),
+                            room: assignedRoom.room,
+                            building: assignedRoom.building,
+                            time: pageTime,
+                            courses: pageCourses,
+                            row: closestRow,
+                            col: closestCol,
+                            file: file.name,
+                            fileUrl: fileUrl,
+                            isCalculatedCol: colHeaders.length === 0
+                        });
+                    });
+                }
+                return extractedStudents;
+            };
+
+            // Helper to get valid coordinate from map (skips nulls)
+            const findValidCoord = (map, index) => {
+                for (let i = index; i < map.length; i++) {
+                    if (map[i]) return map[i];
+                }
+                for (let i = index; i >= 0; i--) {
+                    if (map[i]) return map[i];
+                }
+                return null;
+            };
+
+            // Search logic
+            useEffect(() => {
+                if (!searchQuery.trim()) {
+                    setSearchResults([]);
+                    return;
+                }
+                
+                const lowerQuery = searchQuery.toLowerCase().trim();
+                const normQuery = normalizeId(searchQuery.trim());
+                
+                const results = studentData.filter(student => {
+                    if (student.id.toLowerCase().includes(lowerQuery)) return true;
+                    if (student.normId.includes(normQuery)) return true;
+                    return false;
+                });
+                setSearchResults(results);
+            }, [searchQuery, studentData]);
+
+            const clearFiles = () => {
+                setFiles([]);
+                setStudentData([]);
+                setSearchResults([]);
+                setSearchQuery("");
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto p-4 md:p-8">
+                    {/* Header */}
+                    <div className="text-center mb-8">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Exam Seating Finder</h1>
+                        <p className="text-gray-500">Upload PDF seating plans and instantly find your seat, building, and time.</p>
+                    </div>
+
+                    {/* Main Content Card */}
+                    <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+                        
+                        {/* Upload Section */}
+                        <div className="p-6 bg-gray-50 border-b border-gray-100">
+                            <div 
+                                className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
+                            >
+                                <input 
+                                    type="file" 
+                                    multiple 
+                                    accept=".pdf"
+                                    onChange={handleFileInput}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <div className="flex flex-col items-center justify-center space-y-3">
+                                    <div className="p-3 bg-blue-100 rounded-full text-blue-600">
+                                        <FileUpIcon />
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-gray-700">Click to upload or drag and drop</p>
+                                        <p className="text-sm text-gray-500">PDF files only</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Status & File List */}
+                            {(isProcessing || files.length > 0) && (
+                                <div className="mt-4 space-y-2">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="font-semibold text-gray-700">Loaded Files ({files.length})</span>
+                                        <button onClick={clearFiles} className="text-red-500 hover:text-red-700 text-xs flex items-center">
+                                            <TrashIcon className="w-3 h-3 mr-1" /> Clear All
+                                        </button>
+                                    </div>
+                                    
+                                    {isProcessing && (
+                                        <div className="flex items-center text-blue-600 text-sm animate-pulse">
+                                            <span className="mr-2">●</span> {parseStatus}
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                                        {files.map((f, i) => (
+                                            <div key={i} className="flex items-center bg-white border border-gray-200 px-3 py-1 rounded-full text-xs text-gray-600 shadow-sm">
+                                                <div className="w-2 h-2 rounded-full bg-green-400 mr-2"></div>
+                                                <span className="truncate max-w-[150px]">{f.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    {!isProcessing && studentData.length > 0 && (
+                                        <div className="text-xs text-green-600 font-medium flex items-center mt-2">
+                                            <CheckIcon className="w-4 h-4 mr-1"/>
+                                            Extracted {studentData.length} student records successfully.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Search Section */}
+                        <div className="p-6">
+                            <div className="relative mb-6">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                    <SearchIcon />
+                                </div>
+                                <input
+                                    type="text"
+                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm"
+                                    placeholder="Enter Registration No (e.g. 23FE10CII... or 00186)"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    disabled={studentData.length === 0}
+                                />
+                                {studentData.length > 0 && (
+                                    <div className="text-xs text-gray-500 mt-2 pl-1 flex items-start">
+                                        <div className="mr-1 mt-0.5"><AlertIcon /></div>
+                                        <span>Tip: If your exact ID isn't found, try searching for the last 5 digits. PDFs often confuse 'I', '1' and '11'.</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Results Table */}
+                            {searchQuery && (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Registration No
+                                                </th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Course Code(s)
+                                                </th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Location
+                                                </th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Timing
+                                                </th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Seat Details
+                                                </th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Source
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {searchResults.length > 0 ? (
+                                                searchResults.map((result, idx) => (
+                                                    <tr key={idx} className="hover:bg-blue-50 transition-colors">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                            {result.id}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                            <div className="flex items-center">
+                                                                <span className="mr-1 text-gray-400"><BookIcon /></span>
+                                                                <span className="font-mono text-xs bg-gray-100 rounded px-2 py-1">
+                                                                    {result.courses}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-semibold text-gray-800">Room {result.room}</span>
+                                                                {result.building !== "Unknown" && (
+                                                                    <span className="text-xs text-gray-500 flex items-center mt-1">
+                                                                        <span className="mr-1"><BuildingIcon /></span> {result.building}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            {result.time !== "Unknown" ? (
+                                                                <div className="flex items-center text-xs bg-gray-100 rounded px-2 py-1">
+                                                                    <span className="mr-1 text-gray-400"><ClockIcon /></span>
+                                                                    {result.time}
+                                                                </div>
+                                                            ) : (
+                                                                "-"
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <div className="flex space-x-2">
+                                                                <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-100">
+                                                                    Row {result.row}
+                                                                </span>
+                                                                <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs border border-purple-100" title={result.isCalculatedCol ? "Auto-calculated based on layout" : "From document header"}>
+                                                                    Col {result.col} {result.isCalculatedCol && "*"}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <a 
+                                                                href={result.fileUrl} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center text-blue-600 hover:text-blue-800 hover:underline"
+                                                                title="Click to open original PDF"
+                                                            >
+                                                                <FileIcon className="w-4 h-4 mr-2" />
+                                                                <span className="truncate max-w-[100px]">{result.file}</span>
+                                                                <ExternalLinkIcon className="w-3 h-3 ml-1" />
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">
+                                                        No results found for "{searchQuery}"
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
